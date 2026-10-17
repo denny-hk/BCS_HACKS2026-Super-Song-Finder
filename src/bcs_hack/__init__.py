@@ -58,26 +58,6 @@ def get_spotify_token():
     return access_token
 
 
-def format_regional_availability(markets):
-    """Convert Spotify country codes into a readable regional availability string."""
-    regions = sorted(set(markets or []))
-    if not regions:
-        return "Not available in any Spotify market"
-    if len(regions) <= 12:
-        return f"Available in: {', '.join(regions)}"
-    return f"Available in {len(regions)} markets: {', '.join(regions[:12])}, ..."
-
-
-def format_regional_availability(markets):
-    """Convert Spotify country codes into a readable regional availability string."""
-    regions = sorted(set(markets or []))
-    if not regions:
-        return "Not available in any Spotify market"
-    if len(regions) <= 12:
-        return f"Available in: {', '.join(regions)}"
-    return f"Available in {len(regions)} markets: {', '.join(regions[:12])}, ..."
-
-
 def search_spotify_track(query, market=None):
     token = get_spotify_token()
     params = {"q": query, "type": "track", "limit": 1}
@@ -102,7 +82,27 @@ def search_spotify_track(query, market=None):
     album = track.get("album", {})
     images = album.get("images", [])
     thumbnail = images[-1].get("url") if images else None
-    available_markets = track.get("available_markets", [])
+    available_markets = track.get("available_markets") or []
+    is_playable = track.get("is_playable")
+
+    # Safely initialize restrictions with a default fallback
+    restrictions = "Availability unknown"
+
+    selected_market = (market or "").upper()
+    if selected_market and is_playable is not None:
+        restrictions = (
+            f"Available in {selected_market}"
+            if is_playable
+            else f"Unavailable in {selected_market}"
+        )
+    elif available_markets:
+        restrictions = f"Available in {len(available_markets)} markets"
+    elif is_playable is not None:
+        restrictions = (
+            "Available in requested market"
+            if is_playable
+            else "Unavailable in requested market"
+        )
 
     return {
         "title": track.get("name"),
@@ -141,6 +141,7 @@ def search_youtube_track(query):
     details_url = f"https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id={video_id}&key={YOUTUBE_API_KEY}"
     details_res = requests.get(details_url, timeout=10).json()
 
+    # Safely initialize YouTube restrictions with a default fallback
     restrictions = "Worldwide (No restrictions listed)"
     if "items" in details_res and details_res["items"]:
         content_details = details_res["items"][0].get("contentDetails", {})
