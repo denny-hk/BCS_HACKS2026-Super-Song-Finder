@@ -2,37 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Spotify Song Finder</title>
+    <title>Song Availability Checker</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
         input { width: 70%; padding: 10px; font-size: 16px; }
         button { padding: 10px 20px; font-size: 16px; }
-        #result { margin-top: 20px; }
-        img { max-width: 320px; height: auto; }
+        .results-container { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+        .platform-card { flex: 1; min-width: 300px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+        img { max-width: 100%; height: auto; border-radius: 4px; }
+        .error { color: red; }
     </style>
 </head>
 <body>
-    <h2>Find a Song on Spotify</h2>
+    <h2>Song Availability Checker</h2>
     <input type="text" id="query" placeholder="Enter Artist & Song Name...">
+    <input type="text" id="market" placeholder="Market (optional, e.g. US)">
     <button onclick="checkSong()">Search</button>
 
-    <div id="result"></div>
+    <div class="results-container" id="result"></div>
 
     <script>
         async function checkSong() {
             const query = document.getElementById("query").value;
+            const market = document.getElementById("market").value;
             const resultDiv = document.getElementById("result");
-            resultDiv.innerHTML = "Searching...";
+            resultDiv.innerHTML = "<p>Searching platforms...</p>";
 
             const response = await fetch("/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-                body: new URLSearchParams({ query }).toString()
+                body: new URLSearchParams({ query, market }).toString()
             });
             const data = await response.json();
 
-            if (data.error) {
-                resultDiv.innerHTML = `<p style="color: red;">${data.error}</p>`;
+            // Handle general root error if any
+            if (data.error && !data.spotify && !data.youtube) {
+                resultDiv.innerHTML = `<p class="error">${data.error}</p>`;
                 return;
             }
 

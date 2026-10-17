@@ -8,14 +8,17 @@ from flask import Flask, jsonify, render_template, request
 load_dotenv()
 
 app = Flask(__name__)
+
+# --- Credential Configuration ---
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID") or os.getenv("SPOTIFY_API_KEY")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET") or os.getenv(
     "SPOTIFY_API_SECRET"
 )
 SPOTIFY_ACCESS_TOKEN = os.getenv("SPOTIFY_ACCESS_TOKEN")
-API_KEY = SPOTIFY_CLIENT_ID
-SPOTIFY_API_KEY = SPOTIFY_CLIENT_ID
-SPOTIFY_API_SECRET = SPOTIFY_CLIENT_SECRET
+
+# YouTube API Key Configuration
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
 _SPOTIFY_TOKEN_CACHE = {"access_token": None, "expires_at": 0.0}
 
 
@@ -65,11 +68,25 @@ def format_regional_availability(markets):
     return f"Available in {len(regions)} markets: {', '.join(regions[:12])}, ..."
 
 
-def search_spotify_track(query):
+def format_regional_availability(markets):
+    """Convert Spotify country codes into a readable regional availability string."""
+    regions = sorted(set(markets or []))
+    if not regions:
+        return "Not available in any Spotify market"
+    if len(regions) <= 12:
+        return f"Available in: {', '.join(regions)}"
+    return f"Available in {len(regions)} markets: {', '.join(regions[:12])}, ..."
+
+
+def search_spotify_track(query, market=None):
     token = get_spotify_token()
+    params = {"q": query, "type": "track", "limit": 1}
+    if market:
+        params["market"] = market.upper()
+
     response = requests.get(
         "https://api.spotify.com/v1/search",
-        params={"q": query, "type": "track", "limit": 1},
+        params=params,
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
@@ -109,20 +126,33 @@ def index():
 @app.route("/search", methods=["POST"])
 def search_song():
     query = (request.form.get("query") or "").strip()
+    market = (request.form.get("market") or "").strip()
     if not query:
         return jsonify({"error": "Please enter a song name."}), 400
 
+    response_data = {}
+
+    # 1. Search Spotify
     try:
         result = search_spotify_track(query)
     except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 500
+        response_data["spotify"] = {"error": str(exc)}
     except requests.RequestException:
-        return jsonify({"error": "Spotify search request failed."}), 502
+        response_data["spotify"] = {"error": "Spotify search request failed."}
 
-    if not result:
-        return jsonify({"error": "Song not found on Spotify"})
+    # 2. Search YouTube
+    try:
+        youtube_result = search_youtube_track(query)
+        if youtube_result:
+            response_data["youtube"] = youtube_result
+        else:
+            response_data["youtube"] = {"error": "Video not found on YouTube"}
+    except requests.RequestException:
+        response_data["youtube"] = {"error": "YouTube search request failed."}
+    except Exception as exc:
+        response_data["youtube"] = {"error": str(exc)}
 
-    return jsonify(result)
+    return jsonify(response_data)
 
 
 def main():
