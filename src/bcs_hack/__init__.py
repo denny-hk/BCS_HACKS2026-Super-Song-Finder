@@ -55,11 +55,15 @@ def get_spotify_token():
     return access_token
 
 
-def search_spotify_track(query):
+def search_spotify_track(query, market=None):
     token = get_spotify_token()
+    params = {"q": query, "type": "track", "limit": 1}
+    if market:
+        params["market"] = market.upper()
+
     response = requests.get(
         "https://api.spotify.com/v1/search",
-        params={"q": query, "type": "track", "limit": 1},
+        params=params,
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
@@ -75,6 +79,19 @@ def search_spotify_track(query):
     album = track.get("album", {})
     images = album.get("images", [])
     thumbnail = images[-1].get("url") if images else None
+    available_markets = track.get("available_markets") or []
+    is_playable = track.get("is_playable")
+
+    if available_markets:
+        restrictions = f"Available in {len(available_markets)} markets"
+    elif is_playable is not None:
+        restrictions = (
+            "Available in requested market"
+            if is_playable
+            else "Not available in requested market"
+        )
+    else:
+        restrictions = "Availability unknown"
 
     return {
         "title": track.get("name"),
@@ -86,7 +103,12 @@ def search_spotify_track(query):
         "spotifyUrl": track.get("external_urls", {}).get("spotify"),
         "previewUrl": track.get("preview_url"),
         "popularity": track.get("popularity"),
-        "restrictions": "Available on Spotify",
+        "market": (market or "").upper(),
+        "available_markets": available_markets,
+        "availableMarkets": available_markets,
+        "is_playable": is_playable,
+        "isPlayable": is_playable,
+        "restrictions": restrictions,
     }
 
 
@@ -98,11 +120,12 @@ def index():
 @app.route("/search", methods=["POST"])
 def search_song():
     query = (request.form.get("query") or "").strip()
+    market = (request.form.get("market") or "").strip()
     if not query:
         return jsonify({"error": "Please enter a song name."}), 400
 
     try:
-        result = search_spotify_track(query)
+        result = search_spotify_track(query, market=market or None)
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 500
     except requests.RequestException:
