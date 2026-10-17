@@ -55,6 +55,16 @@ def get_spotify_token():
     return access_token
 
 
+def format_regional_availability(markets):
+    """Convert Spotify country codes into a readable regional availability string."""
+    regions = sorted(set(markets or []))
+    if not regions:
+        return "Not available in any Spotify market"
+    if len(regions) <= 12:
+        return f"Available in: {', '.join(regions)}"
+    return f"Available in {len(regions)} markets: {', '.join(regions[:12])}, ..."
+
+
 def search_spotify_track(query):
     token = get_spotify_token()
     response = requests.get(
@@ -75,6 +85,7 @@ def search_spotify_track(query):
     album = track.get("album", {})
     images = album.get("images", [])
     thumbnail = images[-1].get("url") if images else None
+    available_markets = track.get("available_markets", [])
 
     return {
         "title": track.get("name"),
@@ -86,7 +97,7 @@ def search_spotify_track(query):
         "spotifyUrl": track.get("external_urls", {}).get("spotify"),
         "previewUrl": track.get("preview_url"),
         "popularity": track.get("popularity"),
-        "restrictions": "Available on Spotify",
+        "restrictions": format_regional_availability(available_markets),
     }
 
 

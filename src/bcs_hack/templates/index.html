@@ -41,7 +41,7 @@
                 <p><strong>Artist:</strong> ${data.artist || data.channel}</p>
                 <p><strong>Album:</strong> ${data.album || "Unknown"}</p>
                 <img src="${data.thumbnail || ""}" alt="Album art" />
-                <p><strong>Availability:</strong> ${data.restrictions}</p>
+                <p><strong>Regional availability:</strong> ${data.restrictions}</p>
                 ${data.spotifyUrl ? `<p><a href="${data.spotifyUrl}" target="_blank" rel="noopener">Open in Spotify</a></p>` : ""}
                 ${data.previewUrl ? `<audio controls src="${data.previewUrl}"></audio>` : ""}
             `;
