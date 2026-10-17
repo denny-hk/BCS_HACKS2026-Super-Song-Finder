@@ -25,8 +25,8 @@
 
             const response = await fetch("/search", {
                 method: "POST",
-                headers: { "Content-Type": "x-www-form-urlencoded" },
-                body: `query=${encodeURIComponent(query)}`
+                headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+                body: new URLSearchParams({ query }).toString()
             });
             const data = await response.json();
 
