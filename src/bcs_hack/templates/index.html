@@ -2,83 +2,626 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Song Availability Checker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Finder</title>
+
     <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }
-        input { width: 70%; padding: 10px; font-size: 16px; margin-bottom: 10px; display: block; }
-        button { padding: 10px 20px; font-size: 16px; }
-        .results-container { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
-        .platform-card { flex: 1; min-width: 350px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
-        img { max-width: 100%; height: auto; border-radius: 4px; }
-        .error { color: red; }
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #222;
+            background: #fafafa;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input, button {
+            font: inherit;
+            padding: 11px 13px;
+            border-radius: 7px;
+        }
+
+        input {
+            border: 1px solid #ccc;
+            min-width: 0;
+        }
+
+        #query {
+            flex: 1;
+        }
+
+        #market {
+            width: 110px;
+        }
+
+        button {
+            border: none;
+            background: #222;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        .platform {
+            margin-top: 32px;
+        }
+
+        .platform h2 {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .song-card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 12px 0;
+        }
+
+        .song-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .thumbnail {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #eee;
+            flex-shrink: 0;
+        }
+
+        .song-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .song-title {
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        .song-meta {
+            color: #666;
+            font-size: 14px;
+            margin-top: 6px;
+            overflow-wrap: anywhere;
+        }
+
+        .song-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .song-actions a {
+            text-decoration: none;
+            color: #0759b5;
+            font-size: 14px;
+        }
+
+        .secondary-button {
+            background: #e9edf3;
+            color: #222;
+        }
+
+        .region-results {
+            margin-top: 15px;
+            padding: 14px;
+            background: #f5f7fa;
+            border-radius: 7px;
+            overflow-wrap: anywhere;
+        }
+
+        .region-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+        }
+
+        .region {
+            background: #dff5e5;
+            color: #185c30;
+            padding: 6px 9px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .not-found {
+            background: #eee;
+            color: #555;
+            padding: 6px 9px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .error {
+            color: #b42318;
+        }
+
+        .muted {
+            color: #777;
+            font-size: 14px;
+        }
+
+        .loading {
+            color: #555;
+            padding: 12px 0;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                margin-top: 20px;
+                padding: 0 12px;
+            }
+
+            .search-form {
+                flex-wrap: wrap;
+            }
+
+            #query {
+                flex-basis: 100%;
+            }
+
+            #market {
+                flex: 1;
+            }
+
+            .song-row {
+                align-items: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .thumbnail {
+                width: 65px;
+                height: 65px;
+            }
+
+            .song-info {
+                width: calc(100% - 85px);
+            }
+
+            .song-actions {
+                width: 100%;
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+        }
     </style>
 </head>
-<body>
-    <h2>Song Availability Checker</h2>
-    <input type="text" id="query" placeholder="Enter Artist & Song Name...">
-    <input type="text" id="market" placeholder="Market (optional, e.g. US)">
-    <button onclick="checkSong()">Search</button>
 
-    <div class="results-container" id="result"></div>
+<body>
+    <h1>Music Finder</h1>
+    <p class="subtitle">
+        Search for music across Spotify, YouTube and Apple Music.
+    </p>
+
+    <form id="searchForm" class="search-form">
+        <input
+            id="query"
+            name="query"
+            type="text"
+            placeholder="Enter a song name or artist"
+            required
+        >
+
+        <input
+            id="market"
+            name="market"
+            type="text"
+            maxlength="2"
+            placeholder="Country"
+            value="ca"
+            title="Two-letter country code, e.g. ca, us, jp"
+        >
+
+        <button id="searchButton" type="submit">Search</button>
+    </form>
+
+    <p class="muted">
+        Country code selects the Spotify market and Apple/iTunes search storefront.
+    </p>
+
+    <div id="status" aria-live="polite"></div>
+
+    <section class="platform">
+        <h2>Spotify</h2>
+        <div id="spotifyResults"></div>
+    </section>
+
+    <section class="platform">
+        <h2>YouTube</h2>
+        <div id="youtubeResults"></div>
+    </section>
+
+    <section class="platform">
+        <h2>Apple Music</h2>
+        <div id="appleResults"></div>
+    </section>
 
     <script>
-        async function checkSong() {
-            const query = document.getElementById("query").value;
-            const market = document.getElementById("market").value;
-            const resultDiv = document.getElementById("result");
-            resultDiv.innerHTML = "<p>Searching platforms...</p>";
+        const form = document.getElementById("searchForm");
+        const searchButton = document.getElementById("searchButton");
+        const statusDiv = document.getElementById("status");
 
-            const response = await fetch("/search", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-                body: new URLSearchParams({ query, market }).toString()
+        const spotifyDiv = document.getElementById("spotifyResults");
+        const youtubeDiv = document.getElementById("youtubeResults");
+        const appleDiv = document.getElementById("appleResults");
+
+        function makeElement(tag, className, text) {
+            const element = document.createElement(tag);
+
+            if (className) {
+                element.className = className;
+            }
+
+            if (text !== undefined && text !== null) {
+                element.textContent = text;
+            }
+
+            return element;
+        }
+
+        function makeLink(url, label) {
+            if (!url) {
+                return null;
+            }
+
+            const link = makeElement("a", "", label);
+            link.href = url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+
+            return link;
+        }
+
+        function showMessage(container, message, isError = false) {
+            container.replaceChildren();
+
+            container.appendChild(
+                makeElement(
+                    "p",
+                    isError ? "error" : "muted",
+                    message
+                )
+            );
+        }
+
+        function getErrorMessage(data) {
+            if (data && data.error) {
+                return data.error;
+            }
+
+            return "The request failed. Please try again.";
+        }
+
+        function createSongCard(song, platform) {
+            const card = makeElement("article", "song-card");
+            const row = makeElement("div", "song-row");
+            const info = makeElement("div", "song-info");
+            const actions = makeElement("div", "song-actions");
+
+            if (song.thumbnail) {
+                const image = makeElement("img", "thumbnail");
+                image.src = song.thumbnail;
+                image.alt = "Album or video artwork";
+                image.loading = "lazy";
+                image.onerror = () => image.remove();
+
+                row.appendChild(image);
+            }
+
+            info.appendChild(
+                makeElement("div", "song-title", song.title || "Untitled")
+            );
+
+            if (song.artist) {
+                info.appendChild(
+                    makeElement("div", "song-meta", song.artist)
+                );
+            } else if (song.channel) {
+                info.appendChild(
+                    makeElement("div", "song-meta", song.channel)
+                );
+            }
+
+            if (song.album) {
+                info.appendChild(
+                    makeElement("div", "song-meta", song.album)
+                );
+            }
+
+            if (platform === "spotify" && song.restrictions) {
+                info.appendChild(
+                    makeElement("div", "song-meta", song.restrictions)
+                );
+            }
+
+            row.appendChild(info);
+
+            const url =
+                platform === "spotify"
+                    ? song.spotifyUrl
+                    : platform === "youtube"
+                        ? song.youtubeUrl
+                        : song.appleMusicUrl;
+
+            const link = makeLink(url, "Open on " + (
+                platform === "spotify"
+                    ? "Spotify"
+                    : platform === "youtube"
+                        ? "YouTube"
+                        : "Apple"
+            ));
+
+            if (link) {
+                actions.appendChild(link);
+            }
+
+            if (platform === "apple_music") {
+                const checkButton = makeElement(
+                    "button",
+                    "secondary-button",
+                    "Check regions"
+                );
+
+                checkButton.type = "button";
+
+                const regionDiv = makeElement("div", "region-results");
+                regionDiv.hidden = true;
+
+                checkButton.addEventListener("click", async () => {
+                    if (!regionDiv.hidden &&
+                        checkButton.dataset.checked === "true") {
+                        regionDiv.hidden = true;
+                        checkButton.textContent = "Check regions";
+                        return;
+                    }
+
+                    regionDiv.hidden = false;
+                    checkButton.disabled = true;
+                    checkButton.textContent = "Checking...";
+                    showMessage(regionDiv, "Checking Apple/iTunes catalogs...");
+
+                    try {
+                        const response = await fetch("/api/apple/regions", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                trackName: song.title,
+                                artistName: song.artist
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok || data.error) {
+                            throw new Error(getErrorMessage(data));
+                        }
+
+                        renderAppleRegions(regionDiv, data.results || []);
+                        checkButton.dataset.checked = "true";
+                        checkButton.textContent = "Hide regions";
+                    } catch (error) {
+                        showMessage(
+                            regionDiv,
+                            error.message || "Region lookup failed.",
+                            true
+                        );
+                    } finally {
+                        checkButton.disabled = false;
+                        if (checkButton.dataset.checked !== "true") {
+                            checkButton.textContent = "Check regions";
+                        }
+                    }
+                });
+
+                actions.appendChild(checkButton);
+                card.appendChild(row);
+                card.appendChild(actions);
+                card.appendChild(regionDiv);
+                return card;
+            }
+
+            card.appendChild(row);
+            card.appendChild(actions);
+
+            return card;
+        }
+
+        function renderAppleRegions(container, regions) {
+            container.replaceChildren();
+
+            const found = regions.filter(
+                item => item.status === "found"
+            );
+
+            const missing = regions.filter(
+                item => item.status === "not_found"
+            );
+
+            const errors = regions.filter(
+                item => item.status === "error"
+            );
+
+            container.appendChild(
+                makeElement(
+                    "strong",
+                    "",
+                    `Found matches in ${found.length} of ${regions.length} checked storefronts`
+                )
+            );
+
+            container.appendChild(
+                makeElement("p", "", "Found in catalog:")
+            );
+
+            const foundList = makeElement("div", "region-list");
+
+            found.forEach(item => {
+                const name = item.countryName || item.country;
+                const tag = makeElement("span", "region", name);
+
+                if (item.match && item.match.appleMusicUrl) {
+                    const link = makeLink(
+                        item.match.appleMusicUrl,
+                        "Open"
+                    );
+
+                    tag.appendChild(document.createTextNode(" "));
+                    tag.appendChild(link);
+                }
+
+                foundList.appendChild(tag);
             });
-            const data = await response.json();
 
-            // Handle general root error if any
-            if (data.error && !data.spotify && !data.youtube) {
-                resultDiv.innerHTML = `<p class="error">${data.error}</p>`;
+            if (!found.length) {
+                foundList.appendChild(
+                    makeElement("span", "muted", "No matches found.")
+                );
+            }
+
+            container.appendChild(foundList);
+
+            container.appendChild(
+                makeElement("p", "", "No match found:")
+            );
+
+            const missingList = makeElement("div", "region-list");
+
+            missing.forEach(item => {
+                missingList.appendChild(
+                    makeElement(
+                        "span",
+                        "not-found",
+                        item.countryName || item.country
+                    )
+                );
+            });
+
+            if (!missing.length) {
+                missingList.appendChild(
+                    makeElement("span", "muted", "None.")
+                );
+            }
+
+            container.appendChild(missingList);
+
+            if (errors.length) {
+                container.appendChild(
+                    makeElement(
+                        "p",
+                        "error",
+                        `${errors.length} storefront checks failed. Their availability is unknown.`
+                    )
+                );
+            }
+
+            container.appendChild(
+                makeElement(
+                    "p",
+                    "muted",
+                    "A catalog match does not guarantee that the song can be played."
+                )
+            );
+        }
+
+        function renderResults(container, data, platform) {
+            container.replaceChildren();
+
+            if (data && !Array.isArray(data) && data.error) {
+                showMessage(container, data.error, true);
                 return;
             }
 
-            let htmlContent = "";
-
-            // --- SPOTIFY CARD ---
-            htmlContent += `<div class="platform-card"><h3>Spotify</h3>`;
-            if (data.spotify && !data.spotify.error) {
-                const s = data.spotify;
-                htmlContent += `
-                    <h4>${s.title}</h4>
-                    <p><strong>Artist:</strong> ${s.artist}</p>
-                    <p><strong>Album:</strong> ${s.album || "Unknown"}</p>
-                    ${s.thumbnail ? `<img src="${s.thumbnail}" alt="Album art" />` : ""}
-                    <p><strong>Regional availability:</strong> ${s.restrictions}</p>
-                    ${s.spotifyUrl ? `<p><a href="${s.spotifyUrl}" target="_blank" rel="noopener">Open in Spotify</a></p>` : ""}
-                    ${s.previewUrl ? `<audio controls src="${s.previewUrl}"></audio>` : ""}
-                `;
-            } else {
-                htmlContent += `<p class="error">${data.spotify?.error || "Not found on Spotify"}</p>`;
+            if (!Array.isArray(data) || data.length === 0) {
+                showMessage(container, "No results found.");
+                return;
             }
-            htmlContent += `</div>`;
 
-            // --- YOUTUBE CARD ---
-            htmlContent += `<div class="platform-card"><h3>YouTube</h3>`;
-            if (data.youtube && !data.youtube.error) {
-                const y = data.youtube;
-                htmlContent += `
-                    <h4>${y.title}</h4>
-                    <p><strong>Channel:</strong> ${y.channel}</p>
-                    ${y.thumbnail ? `<img src="${y.thumbnail}" alt="Video thumbnail" />` : ""}
-                    <p><strong>Restrictions:</strong> ${typeof y.restrictions === 'object' ? JSON.stringify(y.restrictions, null, 2) : y.restrictions}</p>
-                    ${y.youtubeUrl ? `<p><a href="${y.youtubeUrl}" target="_blank" rel="noopener">Watch on YouTube</a></p>` : ""}
-                `;
-            } else {
-                htmlContent += `<p class="error">${data.youtube?.error || "Not found on YouTube"}</p>`;
-            }
-            htmlContent += `</div>`;
-
-            resultDiv.innerHTML = htmlContent;
+            data.forEach(song => {
+                container.appendChild(createSongCard(song, platform));
+            });
         }
+
+        form.addEventListener("submit", async event => {
+            event.preventDefault();
+
+            const query = document.getElementById("query").value.trim();
+            const market = document.getElementById("market").value
+                .trim()
+                .toLowerCase();
+
+            if (!query) {
+                return;
+            }
+
+            searchButton.disabled = true;
+            statusDiv.textContent = "Searching all platforms...";
+
+            showMessage(spotifyDiv, "Searching...");
+            showMessage(youtubeDiv, "Searching...");
+            showMessage(appleDiv, "Searching...");
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append("query", query);
+                formData.append("market", market);
+
+                const response = await fetch("/search", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: formData.toString()
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(getErrorMessage(data));
+                }
+
+                renderResults(spotifyDiv, data.spotify, "spotify");
+                renderResults(youtubeDiv, data.youtube, "youtube");
+                renderResults(appleDiv, data.apple_music, "apple_music");
+
+                statusDiv.textContent = "Search complete.";
+            } catch (error) {
+                statusDiv.textContent =
+                    error.message || "Search failed. Please try again.";
+            } finally {
+                searchButton.disabled = false;
+            }
+        });
     </script>
 </body>
 </html>
