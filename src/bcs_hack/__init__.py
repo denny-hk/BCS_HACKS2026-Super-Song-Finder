@@ -114,7 +114,46 @@ def search_spotify_track(query, market=None):
         "spotifyUrl": track.get("external_urls", {}).get("spotify"),
         "previewUrl": track.get("preview_url"),
         "popularity": track.get("popularity"),
-        "restrictions": format_regional_availability(available_markets),
+        "restrictions": restrictions,
+    }
+
+
+def search_youtube_track(query):
+    if not YOUTUBE_API_KEY:
+        return {"error": "YouTube API key is not configured."}
+
+    search_url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&type=video&maxResults=1&key={YOUTUBE_API_KEY}"
+    response = requests.get(search_url, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    items = data.get("items", [])
+    if not items:
+        return None
+
+    item = items[0]
+    video_id = item["id"]["videoId"]
+    snippet = item["snippet"]
+    thumbnails = snippet.get("thumbnails", {})
+    thumbnail = thumbnails.get("medium", {}).get("url") or thumbnails.get("default", {}).get("url")
+
+    # Fetch region restriction details for the video
+    details_url = f"https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id={video_id}&key={YOUTUBE_API_KEY}"
+    details_res = requests.get(details_url, timeout=10).json()
+
+    restrictions = "Worldwide (No restrictions listed)"
+    if "items" in details_res and details_res["items"]:
+        content_details = details_res["items"][0].get("contentDetails", {})
+        if "regionRestriction" in content_details:
+            restrictions = content_details["regionRestriction"]
+
+    return {
+        "title": snippet.get("title"),
+        "channel": snippet.get("channelTitle"),
+        "thumbnail": thumbnail,
+        "videoId": video_id,
+        "youtubeUrl": f"https://www.youtube.com/watch?v={video_id}",
+        "restrictions": restrictions,
     }
 
 
@@ -134,7 +173,11 @@ def search_song():
 
     # 1. Search Spotify
     try:
-        result = search_spotify_track(query)
+        spotify_result = search_spotify_track(query, market=market)
+        if spotify_result:
+            response_data["spotify"] = spotify_result
+        else:
+            response_data["spotify"] = {"error": "Song not found on Spotify"}
     except RuntimeError as exc:
         response_data["spotify"] = {"error": str(exc)}
     except requests.RequestException:
