@@ -8,14 +8,17 @@ from flask import Flask, jsonify, render_template, request
 load_dotenv()
 
 app = Flask(__name__)
+
+# --- Credential Configuration ---
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID") or os.getenv("SPOTIFY_API_KEY")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET") or os.getenv(
     "SPOTIFY_API_SECRET"
 )
 SPOTIFY_ACCESS_TOKEN = os.getenv("SPOTIFY_ACCESS_TOKEN")
-API_KEY = SPOTIFY_CLIENT_ID
-SPOTIFY_API_KEY = SPOTIFY_CLIENT_ID
-SPOTIFY_API_SECRET = SPOTIFY_CLIENT_SECRET
+
+# YouTube API Key Configuration
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
 _SPOTIFY_TOKEN_CACHE = {"access_token": None, "expires_at": 0.0}
 
 
@@ -110,12 +113,7 @@ def search_spotify_track(query, market=None):
         "spotifyUrl": track.get("external_urls", {}).get("spotify"),
         "previewUrl": track.get("preview_url"),
         "popularity": track.get("popularity"),
-        "market": selected_market,
-        "available_markets": available_markets,
-        "availableMarkets": available_markets,
-        "is_playable": is_playable,
-        "isPlayable": is_playable,
-        "restrictions": restrictions,
+        "restrictions": "Available on Spotify",
     }
 
 
@@ -131,17 +129,29 @@ def search_song():
     if not query:
         return jsonify({"error": "Please enter a song name."}), 400
 
+    response_data = {}
+
+    # 1. Search Spotify
     try:
-        result = search_spotify_track(query, market=market or None)
+        result = search_spotify_track(query)
     except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 500
+        response_data["spotify"] = {"error": str(exc)}
     except requests.RequestException:
-        return jsonify({"error": "Spotify search request failed."}), 502
+        response_data["spotify"] = {"error": "Spotify search request failed."}
 
-    if not result:
-        return jsonify({"error": "Song not found on Spotify"})
+    # 2. Search YouTube
+    try:
+        youtube_result = search_youtube_track(query)
+        if youtube_result:
+            response_data["youtube"] = youtube_result
+        else:
+            response_data["youtube"] = {"error": "Video not found on YouTube"}
+    except requests.RequestException:
+        response_data["youtube"] = {"error": "YouTube search request failed."}
+    except Exception as exc:
+        response_data["youtube"] = {"error": str(exc)}
 
-    return jsonify(result)
+    return jsonify(response_data)
 
 
 def main():
