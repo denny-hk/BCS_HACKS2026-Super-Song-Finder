@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Song Region Finder</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        input { width: 70%; padding: 10px; font-size: 16px; }
+        button { padding: 10px 20px; font-size: 16px; }
+        #result { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h2>Check Song Region Availability</h2>
+    <input type="text" id="query" placeholder="Enter Artist & Song Name...">
+    <button onclick="checkSong()">Search</button>
+
+    <div id="result"></div>
+
+    <script>
+        async function checkSong() {
+            const query = document.getElementById("query").value;
+            const resultDiv = document.getElementById("result");
+            resultDiv.innerHTML = "Searching...";
+
+            const response = await fetch("/search", {
+                method: "POST",
+                headers: { "Content-Type": "x-www-form-urlencoded" },
+                body: `query=${encodeURIComponent(query)}`
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                resultDiv.innerHTML = `<p style="color: red;">${data.error}</p>`;
+                return;
+            }
+
+            resultDiv.innerHTML = `
+                <h3>${data.title}</h3>
+                <p><strong>Channel:</strong> ${data.channel}</p>
+                <img src="${data.thumbnail}" width="320">
+                <p><strong>Region Restrictions:</strong></p>
+                <pre>${JSON.stringify(data.restrictions, null, 2)}</pre>
+            `;
+        }
+    </script>
+</body>
+</html>
