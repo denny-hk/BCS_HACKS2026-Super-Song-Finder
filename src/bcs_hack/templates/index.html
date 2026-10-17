@@ -14,6 +14,7 @@
 <body>
     <h2>Find a Song on Spotify</h2>
     <input type="text" id="query" placeholder="Enter Artist & Song Name...">
+    <input type="text" id="market" placeholder="Market (optional, e.g. US)">
     <button onclick="checkSong()">Search</button>
 
     <div id="result"></div>
@@ -21,13 +22,14 @@
     <script>
         async function checkSong() {
             const query = document.getElementById("query").value;
+            const market = document.getElementById("market").value;
             const resultDiv = document.getElementById("result");
             resultDiv.innerHTML = "Searching...";
 
             const response = await fetch("/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-                body: new URLSearchParams({ query }).toString()
+                body: new URLSearchParams({ query, market }).toString()
             });
             const data = await response.json();
 
@@ -36,12 +38,24 @@
                 return;
             }
 
+            const region = data.market || "Global";
+            const markets = Array.isArray(data.availableMarkets) && data.availableMarkets.length
+                ? data.availableMarkets.slice(0, 10).join(", ") + (data.availableMarkets.length > 10 ? "..." : "")
+                : "Not provided";
+            const availability = data.is_playable === true
+                ? `Available in ${region}`
+                : data.is_playable === false
+                    ? `Unavailable in ${region}`
+                    : data.restrictions || "Availability unknown";
+
             resultDiv.innerHTML = `
                 <h3>${data.title}</h3>
                 <p><strong>Artist:</strong> ${data.artist || data.channel}</p>
                 <p><strong>Album:</strong> ${data.album || "Unknown"}</p>
+                <p><strong>Market:</strong> ${region}</p>
+                <p><strong>Availability:</strong> ${availability}</p>
+                <p><strong>Available Markets:</strong> ${markets}</p>
                 <img src="${data.thumbnail || ""}" alt="Album art" />
-                <p><strong>Availability:</strong> ${data.restrictions}</p>
                 ${data.spotifyUrl ? `<p><a href="${data.spotifyUrl}" target="_blank" rel="noopener">Open in Spotify</a></p>` : ""}
                 ${data.previewUrl ? `<audio controls src="${data.previewUrl}"></audio>` : ""}
             `;
