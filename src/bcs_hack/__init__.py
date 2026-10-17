@@ -82,13 +82,20 @@ def search_spotify_track(query, market=None):
     available_markets = track.get("available_markets") or []
     is_playable = track.get("is_playable")
 
-    if available_markets:
+    selected_market = (market or "").upper()
+    if selected_market and is_playable is not None:
+        restrictions = (
+            f"Available in {selected_market}"
+            if is_playable
+            else f"Unavailable in {selected_market}"
+        )
+    elif available_markets:
         restrictions = f"Available in {len(available_markets)} markets"
     elif is_playable is not None:
         restrictions = (
             "Available in requested market"
             if is_playable
-            else "Not available in requested market"
+            else "Unavailable in requested market"
         )
     else:
         restrictions = "Availability unknown"
@@ -103,7 +110,7 @@ def search_spotify_track(query, market=None):
         "spotifyUrl": track.get("external_urls", {}).get("spotify"),
         "previewUrl": track.get("preview_url"),
         "popularity": track.get("popularity"),
-        "market": (market or "").upper(),
+        "market": selected_market,
         "available_markets": available_markets,
         "availableMarkets": available_markets,
         "is_playable": is_playable,

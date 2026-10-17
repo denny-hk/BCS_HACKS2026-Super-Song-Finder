@@ -38,16 +38,22 @@
                 return;
             }
 
+            const region = data.market || "Global";
             const markets = Array.isArray(data.availableMarkets) && data.availableMarkets.length
                 ? data.availableMarkets.slice(0, 10).join(", ") + (data.availableMarkets.length > 10 ? "..." : "")
                 : "Not provided";
+            const availability = data.is_playable === true
+                ? `Available in ${region}`
+                : data.is_playable === false
+                    ? `Unavailable in ${region}`
+                    : data.restrictions || "Availability unknown";
 
             resultDiv.innerHTML = `
                 <h3>${data.title}</h3>
                 <p><strong>Artist:</strong> ${data.artist || data.channel}</p>
                 <p><strong>Album:</strong> ${data.album || "Unknown"}</p>
-                <p><strong>Market:</strong> ${data.market || "Global"}</p>
-                <p><strong>Availability:</strong> ${data.restrictions}</p>
+                <p><strong>Market:</strong> ${region}</p>
+                <p><strong>Availability:</strong> ${availability}</p>
                 <p><strong>Available Markets:</strong> ${markets}</p>
                 <img src="${data.thumbnail || ""}" alt="Album art" />
                 ${data.spotifyUrl ? `<p><a href="${data.spotifyUrl}" target="_blank" rel="noopener">Open in Spotify</a></p>` : ""}
