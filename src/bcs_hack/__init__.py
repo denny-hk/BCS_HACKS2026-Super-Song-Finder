@@ -1,4 +1,5 @@
 import os
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -7,7 +8,86 @@ from flask import Flask, jsonify, render_template, request
 load_dotenv()
 
 app = Flask(__name__)
-API_KEY = os.getenv("YOUTUBE_API_KEY")
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID") or os.getenv("SPOTIFY_API_KEY")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET") or os.getenv(
+    "SPOTIFY_API_SECRET"
+)
+SPOTIFY_ACCESS_TOKEN = os.getenv("SPOTIFY_ACCESS_TOKEN")
+API_KEY = SPOTIFY_CLIENT_ID
+SPOTIFY_API_KEY = SPOTIFY_CLIENT_ID
+SPOTIFY_API_SECRET = SPOTIFY_CLIENT_SECRET
+_SPOTIFY_TOKEN_CACHE = {"access_token": None, "expires_at": 0.0}
+
+
+def get_spotify_token():
+    """Return a valid Spotify access token, reusing a cached one when possible."""
+    now = time.time()
+    cached_token = _SPOTIFY_TOKEN_CACHE["access_token"]
+    expires_at = _SPOTIFY_TOKEN_CACHE["expires_at"]
+
+    if cached_token and now < expires_at - 30:
+        return cached_token
+
+    if SPOTIFY_ACCESS_TOKEN:
+        _SPOTIFY_TOKEN_CACHE["access_token"] = SPOTIFY_ACCESS_TOKEN
+        _SPOTIFY_TOKEN_CACHE["expires_at"] = now + 3600
+        return SPOTIFY_ACCESS_TOKEN
+
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        raise RuntimeError("Spotify API credentials are not configured.")
+
+    response = requests.post(
+        "https://accounts.spotify.com/api/token",
+        data={"grant_type": "client_credentials"},
+        auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET),
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    token_data = response.json()
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise RuntimeError("Spotify token request did not include an access token.")
+
+    expires_in = int(token_data.get("expires_in", 3600))
+    _SPOTIFY_TOKEN_CACHE["access_token"] = access_token
+    _SPOTIFY_TOKEN_CACHE["expires_at"] = now + expires_in
+    return access_token
+
+
+def search_spotify_track(query):
+    token = get_spotify_token()
+    response = requests.get(
+        "https://api.spotify.com/v1/search",
+        params={"q": query, "type": "track", "limit": 1},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    data = response.json()
+    items = data.get("tracks", {}).get("items", [])
+    if not items:
+        return None
+
+    track = items[0]
+    artists = ", ".join(artist["name"] for artist in track.get("artists", []))
+    album = track.get("album", {})
+    images = album.get("images", [])
+    thumbnail = images[-1].get("url") if images else None
+
+    return {
+        "title": track.get("name"),
+        "artist": artists,
+        "channel": artists,
+        "album": album.get("name"),
+        "thumbnail": thumbnail,
+        "trackId": track.get("id"),
+        "spotifyUrl": track.get("external_urls", {}).get("spotify"),
+        "previewUrl": track.get("preview_url"),
+        "popularity": track.get("popularity"),
+        "restrictions": "Available on Spotify",
+    }
 
 
 @app.route("/")
@@ -21,58 +101,22 @@ def search_song():
     if not query:
         return jsonify({"error": "Please enter a song name."}), 400
 
-    if not API_KEY:
-        return jsonify({"error": "YouTube API key is not configured."}), 500
+    try:
+        result = search_spotify_track(query)
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 500
+    except requests.RequestException:
+        return jsonify({"error": "Spotify search request failed."}), 502
 
-    # Step 1: Search YouTube for the video ID
-    search_params = {
-        "part": "snippet",
-        "q": query,
-        "type": "video",
-        "maxResults": 1,
-        "key": API_KEY,
-    }
-    search_res = requests.get(
-        "https://www.googleapis.com/youtube/v3/search",
-        params=search_params,
-        timeout=10,
-    )
-    search_data = search_res.json()
+    if not result:
+        return jsonify({"error": "Song not found on Spotify"})
 
-    if search_res.status_code != 200 or not search_data.get("items"):
-        return jsonify({"error": "Song not found on YouTube"})
+    return jsonify(result)
 
-    item = search_data["items"][0]
-    video_id = item["id"]["videoId"]
-    title = item["snippet"]["title"]
-    channel = item["snippet"]["channelTitle"]
-    thumbnail = item["snippet"]["thumbnails"]["medium"]["url"]
 
-    # Step 2: Get video details to check region restrictions
-    details_res = requests.get(
-        "https://www.googleapis.com/youtube/v3/videos",
-        params={"part": "contentDetails", "id": video_id, "key": API_KEY},
-        timeout=10,
-    )
-    details_data = details_res.json()
-
-    restrictions = None
-    if details_data.get("items"):
-        content_details = details_data["items"][0]["contentDetails"]
-        restrictions = content_details.get(
-            "regionRestriction", "No restrictions (Available Worldwide)"
-        )
-
-    return jsonify(
-        {
-            "title": title,
-            "channel": channel,
-            "thumbnail": thumbnail,
-            "videoId": video_id,
-            "restrictions": restrictions,
-        }
-    )
+def main():
+    app.run(debug=True)
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    main()
